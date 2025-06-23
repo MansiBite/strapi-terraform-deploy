@@ -14,11 +14,9 @@ FROM node:18-slim AS runner
 
 WORKDIR /app
 
-# Copy built app from builder stage
 COPY --from=builder /app /app
 
-# Install only production dependencies (already copied package.json from builder)
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
 EXPOSE 1337
 
