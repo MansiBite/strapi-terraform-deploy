@@ -51,4 +51,4 @@ jobs:
 
       - name: Terraform Apply
         working-directory: terraform2
-        run: terraform apply -auto-approve
+        run: terraform apply -input=false -auto-approve -var="image_url=${{ env.ECR_URL }}/${{ env.ECR_REPO }}:latest"

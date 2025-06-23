@@ -3,8 +3,7 @@ variable "region" {
 }
 
 variable "image_url" {
-  description = "ECR Image URI"
-  type        = string
+  default = "057569470997.dkr.ecr.ap-south-1.amazonaws.com/mansibite:latest"
 }
 
 variable "app_port" {

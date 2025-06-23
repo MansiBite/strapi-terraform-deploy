@@ -1,4 +1,4 @@
-output "strapi_service_info" {
-  description = "Go to AWS Console → ECS → strapi-service → Task → Public IP"
-  value       = "Login to AWS ECS console to get public IP"
+output "strapi_url" {
+  description = "Strapi service running in ECS"
+  value       = "https://console.aws.amazon.com/ecs/home?region=ap-south-1#/clusters/strapi-cluster/services/strapi-service/tasks"
 }
