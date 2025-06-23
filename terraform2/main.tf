@@ -77,7 +77,7 @@ resource "aws_ecs_cluster" "strapi_cluster" {
   name = "strapi-cluster"
 }
 
-# Task Definition
+# ECS Task Definition with Logs Enabled
 resource "aws_ecs_task_definition" "strapi_task" {
   family                   = "strapi-task"
   requires_compatibilities = ["FARGATE"]
@@ -96,7 +96,15 @@ resource "aws_ecs_task_definition" "strapi_task" {
           containerPort = var.app_port,
           protocol      = "tcp"
         }
-      ]
+      ],
+      logConfiguration = {
+        logDriver = "awslogs",
+        options = {
+          awslogs-group         = "/ecs/strapi"
+          awslogs-region        = var.region
+          awslogs-stream-prefix = "strapi"
+        }
+      }
     }
   ])
 }
