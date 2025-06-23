@@ -1,0 +1,25 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Docker
+.dockerignore
+.env
+docker-compose.override.yml
+
+# Terraform
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+crash.log
+*.tfvars
+*.pem
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# VSCode / IDE
+.vscode/
+.idea/
