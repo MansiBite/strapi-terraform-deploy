@@ -9,3 +9,9 @@ variable "image_url" {
 variable "app_port" {
   default = 1337
 }
+
+variable "app_keys" {
+  description = "App keys for Strapi middleware"
+  type        = string
+}
+

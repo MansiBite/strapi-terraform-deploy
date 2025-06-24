@@ -77,7 +77,7 @@ resource "aws_ecs_cluster" "strapi_cluster" {
   name = "strapi-cluster"
 }
 
-# ECS Task Definition with Logs Enabled
+# ECS Task Definition with Logs and Environment Variable APP_KEYS
 resource "aws_ecs_task_definition" "strapi_task" {
   family                   = "strapi-task"
   requires_compatibilities = ["FARGATE"]
@@ -97,6 +97,12 @@ resource "aws_ecs_task_definition" "strapi_task" {
           protocol      = "tcp"
         }
       ],
+      environment = [
+        {
+          name  = "APP_KEYS"
+          value = var.app_keys
+        }
+      ],
       logConfiguration = {
         logDriver = "awslogs",
         options = {
@@ -108,6 +114,7 @@ resource "aws_ecs_task_definition" "strapi_task" {
     }
   ])
 }
+
 
 # ECS Service
 resource "aws_ecs_service" "strapi_service" {
