@@ -1,19 +1,21 @@
+
 provider "aws" {
   region = var.region
 }
+
+# IAM Role (Data source)
 
 data "aws_iam_role" "ecs_task_execution_role" {
   name = "ecsTaskExecutionRole"
 }
 
-# VPC
+
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
 }
 
-# Subnets
 resource "aws_subnet" "public_1" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
@@ -28,7 +30,6 @@ resource "aws_subnet" "public_2" {
   map_public_ip_on_launch = true
 }
 
-# Internet Gateway + Route Table
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
 }
@@ -52,7 +53,7 @@ resource "aws_route_table_association" "a2" {
   route_table_id = aws_route_table.rt.id
 }
 
-# Security Group
+
 resource "aws_security_group" "strapi_sg" {
   name   = "strapi-sg"
   vpc_id = aws_vpc.main.id
@@ -72,51 +73,126 @@ resource "aws_security_group" "strapi_sg" {
   }
 }
 
-# ECS Cluster
-resource "aws_ecs_cluster" "strapi_cluster" {
-  name = "strapi-cluster"
+
+resource "aws_ecs_cluster" "strapi_cluster1" {
+  name = "strapi-cluster1"
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
 }
 
-# ECS Task Definition with Secrets
-resource "aws_ecs_task_definition" "strapi_task" {
-  family                   = "strapi-task"
+
+resource "aws_cloudwatch_log_group" "strapi_logs" {
+  name              = "/ecs/strapi"
+  retention_in_days = 7
+}
+
+
+resource "aws_ecs_task_definition" "strapi_task1" {
+  family                   = "strapi-task1"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = "1024"
   memory                   = "3072"
   execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
 
-  container_definitions = jsonencode([{
-    name      = "strapi"
-    image     = var.image_url
-    essential = true
-    portMappings = [
-      {
-        containerPort = var.app_port
-        protocol      = "tcp"
+  container_definitions = jsonencode([
+    {
+      name      = "strapi"
+      image     = var.image_url
+      essential = true
+      portMappings = [
+        {
+          containerPort = var.app_port
+          protocol      = "tcp"
+        }
+      ],
+      logConfiguration = {
+        logDriver = "awslogs",
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.strapi_logs.name,
+          awslogs-region        = var.region,
+          awslogs-stream-prefix = "ecs"
+        }
       }
-    ]
-    environment = [
-      { name = "APP_KEYS",              value = var.app_keys },
-      { name = "ADMIN_JWT_SECRET",      value = var.admin_jwt_secret },
-      { name = "API_TOKEN_SALT",        value = var.api_token_salt },
-      { name = "TRANSFER_TOKEN_SALT",   value = var.transfer_token_salt },
-      { name = "JWT_SECRET",            value = var.jwt_secret }
-    ]
-  }])
+    }
+  ])
 }
 
-# ECS Service
-resource "aws_ecs_service" "strapi_service" {
-  name            = "strapi-service"
-  cluster         = aws_ecs_cluster.strapi_cluster.id
-  task_definition = aws_ecs_task_definition.strapi_task.arn
+
+resource "aws_ecs_service" "strapi_service1" {
+  name            = "strapi-service1"
+  cluster         = aws_ecs_cluster.strapi_cluster1.id
+  task_definition = aws_ecs_task_definition.strapi_task1.arn
   desired_count   = 1
   launch_type     = "FARGATE"
 
   network_configuration {
     subnets         = [aws_subnet.public_1.id, aws_subnet.public_2.id]
     assign_public_ip = true
-    security_groups  = [aws_security_group.strapi_sg.id]
+    security_groups  = [aws_security_group.strapi_sg1.id]
   }
+}
+
+
+resource "aws_cloudwatch_metric_alarm" "high_cpu" {
+  alarm_name          = "HighCPUUtilization"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "ECS/ContainerInsights"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 70
+  alarm_description   = "Triggered when CPU > 70%"
+  dimensions = {
+    ClusterName = aws_ecs_cluster.strapi_cluster1.name
+    ServiceName = aws_ecs_service.strapi_service1.name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "high_memory" {
+  alarm_name          = "HighMemoryUtilization"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "MemoryUtilization"
+  namespace           = "ECS/ContainerInsights"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 80
+  alarm_description   = "Triggered when Memory > 80%"
+  dimensions = {
+    ClusterName = aws_ecs_cluster.strapi_cluster1.name
+    ServiceName = aws_ecs_service.strapi_service1.name
+  }
+}
+
+
+
+resource "aws_cloudwatch_dashboard" "ecs_dashboard" {
+  dashboard_name = "StrapiDashboard"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type = "metric",
+        x = 0,
+        y = 0,
+        width = 12,
+        height = 6,
+        properties = {
+          metrics = [
+            ["ECS/ContainerInsights", "CPUUtilization", "ClusterName", aws_ecs_cluster.strapi_cluster1.name, "ServiceName", aws_ecs_service.strapi_service1.name],
+            ["ECS/ContainerInsights", "MemoryUtilization", "ClusterName", aws_ecs_cluster.strapi_cluster1.name, "ServiceName", aws_ecs_service.strapi_service1.name]
+          ],
+          view = "timeSeries",
+          stacked = false,
+          region = var.region,
+          title = "Strapi ECS CPU & Memory"
+        }
+      }
+    ]
+  })
 }
