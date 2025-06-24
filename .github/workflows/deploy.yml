@@ -52,4 +52,15 @@ jobs:
 
       - name: Terraform Apply
         working-directory: terraform2
-        run: terraform apply -input=false -auto-approve -var="image_url=${{ env.ECR_URL }}/${{ env.ECR_REPO }}:latest" -var="app_keys=mySuperSecretKeyA,mySuperSecretKeyB"
+        run: |
+          terraform apply -input=false -auto-approve \
+            -var="image_url=${{ env.ECR_URL }}/${{ env.ECR_REPO }}:latest" \
+            -var="app_keys=${{ secrets.APP_KEYS }}" \
+            -var="admin_jwt_secret=${{ secrets.ADMIN_JWT_SECRET }}" \
+            -var="api_token_salt=${{ secrets.API_TOKEN_SALT }}" \
+            -var="transfer_token_salt=${{ secrets.TRANSFER_TOKEN_SALT }}" \
+            -var="encryption_key=${{ secrets.ENCRYPTION_KEY }}" \
+            -var="flag_nps=true" \
+            -var="flag_promote_ee=true"
+
+#Task completed
