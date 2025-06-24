@@ -77,9 +77,7 @@ resource "aws_ecs_cluster" "strapi_cluster" {
   name = "strapi-cluster"
 }
 
-# ... (all your existing resources remain unchanged above)
-
-# ECS Task Definition with All Required Environment Variables
+# ECS Task Definition with Secrets
 resource "aws_ecs_task_definition" "strapi_task" {
   family                   = "strapi-task"
   requires_compatibilities = ["FARGATE"]
@@ -88,22 +86,25 @@ resource "aws_ecs_task_definition" "strapi_task" {
   memory                   = "3072"
   execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
 
- container_definitions = jsonencode([
-    {
-      name      = "strapi"
-      image     = var.image_url
-      essential = true
-      portMappings = [
-        {
-          containerPort = var.app_port
-          protocol      = "tcp"
-        }
-      ]
-    }
-  ])
+  container_definitions = jsonencode([{
+    name      = "strapi"
+    image     = var.image_url
+    essential = true
+    portMappings = [
+      {
+        containerPort = var.app_port
+        protocol      = "tcp"
+      }
+    ]
+    environment = [
+      { name = "APP_KEYS",              value = var.app_keys },
+      { name = "ADMIN_JWT_SECRET",      value = var.admin_jwt_secret },
+      { name = "API_TOKEN_SALT",        value = var.api_token_salt },
+      { name = "TRANSFER_TOKEN_SALT",   value = var.transfer_token_salt },
+      { name = "JWT_SECRET",            value = var.jwt_secret }
+    ]
+  }])
 }
-
-
 
 # ECS Service
 resource "aws_ecs_service" "strapi_service" {
