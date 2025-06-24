@@ -1,15 +1,11 @@
-variable "aws_region" {
+variable "region" {
   default = "ap-south-1"
 }
 
-variable "instance_type" {
-  default = "t3.xlarge"
+variable "image_url" {
+  default = "057569470997.dkr.ecr.ap-south-1.amazonaws.com/mansibite:latest"
 }
 
-variable "key_name" {
-  default = "strapi-key"
-}
-
-variable "private_key_path" {
-  default = "strapi-key1.pem"
+variable "app_port" {
+  default = 1337
 }

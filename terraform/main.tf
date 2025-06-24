@@ -1,94 +1,121 @@
 provider "aws" {
-  region = var.aws_region
+  region = var.region
 }
 
-resource "tls_private_key" "strapi_key" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
+data "aws_iam_role" "ecs_task_execution_role" {
+  name = "ecsTaskExecutionRole"
 }
 
-resource "aws_key_pair" "strapi_key" {
-  key_name   = var.key_name
-  public_key = tls_private_key.strapi_key.public_key_openssh
+# VPC
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 }
 
-resource "local_file" "private_key_pem" {
-  content         = tls_private_key.strapi_key.private_key_pem
-  filename        = var.private_key_path
-  file_permission = "0400"
+# Subnets
+resource "aws_subnet" "public_1" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "${var.region}a"
+  map_public_ip_on_launch = true
 }
 
-data "aws_vpc" "default" {
-  default = true
+resource "aws_subnet" "public_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.2.0/24"
+  availability_zone       = "${var.region}b"
+  map_public_ip_on_launch = true
 }
 
-resource "aws_security_group" "strapi_sg" {
-  name        = "strapi-sg"
-  description = "Allow SSH and Strapi Admin"
-  vpc_id      = data.aws_vpc.default.id
+# Internet Gateway + Route Table
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.main.id
+}
 
-  ingress {
-    description      = "SSH"
-    from_port        = 22
-    to_port          = 22
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
+resource "aws_route_table" "rt" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.gw.id
   }
+}
+
+resource "aws_route_table_association" "a1" {
+  subnet_id      = aws_subnet.public_1.id
+  route_table_id = aws_route_table.rt.id
+}
+
+resource "aws_route_table_association" "a2" {
+  subnet_id      = aws_subnet.public_2.id
+  route_table_id = aws_route_table.rt.id
+}
+
+# Security Group
+resource "aws_security_group" "strapi_sg" {
+  name   = "strapi-sg"
+  vpc_id = aws_vpc.main.id
 
   ingress {
-    description      = "Strapi Admin"
-    from_port        = 1337
-    to_port          = 1337
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
+    from_port   = var.app_port
+    to_port     = var.app_port
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
-    description      = "Allow all outbound"
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "Strapi SG GP"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
-resource "aws_instance" "strapi_ec2" {
-  ami                    = "ami-0f918f7e67a3323f0"  # Ubuntu 22.04 LTS (us-east-1)
-  instance_type          = var.instance_type
-  key_name               = aws_key_pair.strapi_key.key_name
-  vpc_security_group_ids = [aws_security_group.strapi_sg.id]
+# ECS Cluster
+resource "aws_ecs_cluster" "strapi_cluster" {
+  name = "strapi-cluster"
+}
 
-  provisioner "file" {
-    source      = "strapi-setup.sh"
-    destination = "/home/ubuntu/strapi-setup.sh"
+# ... (all your existing resources remain unchanged above)
 
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      private_key = tls_private_key.strapi_key.private_key_pem
-      host        = self.public_ip
+# ECS Task Definition with All Required Environment Variables
+resource "aws_ecs_task_definition" "strapi_task" {
+  family                   = "strapi-task"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "1024"
+  memory                   = "3072"
+  execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
+
+ container_definitions = jsonencode([
+    {
+      name      = "strapi"
+      image     = var.image_url
+      essential = true
+      portMappings = [
+        {
+          containerPort = var.app_port
+          protocol      = "tcp"
+        }
+      ]
     }
-  }
+  ])
+}
 
-  provisioner "remote-exec" {
-    inline = [
-      "chmod +x /home/ubuntu/strapi-setup.sh",
-      "sudo /home/ubuntu/strapi-setup.sh"
-    ]
 
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      private_key = tls_private_key.strapi_key.private_key_pem
-      host        = self.public_ip
-    }
-  }
 
-  tags = {
-    Name = "StrapiApp"
+# ECS Service
+resource "aws_ecs_service" "strapi_service" {
+  name            = "strapi-service"
+  cluster         = aws_ecs_cluster.strapi_cluster.id
+  task_definition = aws_ecs_task_definition.strapi_task.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = [aws_subnet.public_1.id, aws_subnet.public_2.id]
+    assign_public_ip = true
+    security_groups  = [aws_security_group.strapi_sg.id]
   }
 }

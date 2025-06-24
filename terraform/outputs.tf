@@ -1,3 +1,4 @@
-output "ec2_public_ip" {
-  value = aws_instance.strapi_ec2.public_ip
+output "strapi_url" {
+  description = "Access your Strapi app using this IP"
+  value       = "http://${aws_ecs_service.strapi_service1.network_configuration[0].assign_public_ip ? "Check ECS console for Public IP" : "Only internal access"}"
 }
