@@ -93,7 +93,7 @@ resource "aws_ecs_task_definition" "strapi_task" {
     image     = var.image_url
     essential = true
     portMappings = [{
-      containerPort = var.app_port
+      containerPort = 1337
       protocol      = "tcp"
     }],
     environment = [
