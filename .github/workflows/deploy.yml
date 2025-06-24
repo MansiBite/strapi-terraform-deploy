@@ -52,6 +52,7 @@ jobs:
 
       - name: Terraform Apply
         run: |
+          cd terraform2
           terraform apply -input=false -auto-approve \
             -var="image_url=${{ secrets.IMAGE_URL }}" \
             -var="app_keys=${{ secrets.APP_KEYS }}" \
@@ -59,6 +60,5 @@ jobs:
             -var="api_token_salt=${{ secrets.API_TOKEN_SALT }}" \
             -var="transfer_token_salt=${{ secrets.TRANSFER_TOKEN_SALT }}" \
             -var="encryption_key=${{ secrets.ENCRYPTION_KEY }}"
-
 
 # Task Updated
