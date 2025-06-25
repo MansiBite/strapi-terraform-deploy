@@ -1,30 +1,26 @@
-# --------- Stage 1: Build ---------
-FROM node:18 AS builder
+# --------- Strapi Dev Mode Image ---------
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy only package files and install dependencies
-COPY package*.json ./
+# Install Strapi CLI globally
+RUN npm install -g strapi@latest
+
+# Copy project files
+COPY . .
+
+# Install dependencies
 RUN npm install
 
-# Copy the entire project and build the Strapi admin panel
-COPY . .
-RUN npm run build
-
-# --------- Stage 2: Runtime ---------
-FROM node:18-slim AS runner
-
-# Install only production dependencies
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --production
-
-# Copy built project from builder
-COPY --from=builder /app ./
+# ⚠️ Do NOT build admin panel
+# RUN npm run build 
 
 # Expose Strapi default port
 EXPOSE 1337
 
-# Start the app
-CMD ["npm", "start"]
+# Set environment to development (also done in ECS task but safe here too)
+ENV NODE_ENV=development
+
+# Start Strapi in development mode
+CMD ["npm", "run", "develop"]
