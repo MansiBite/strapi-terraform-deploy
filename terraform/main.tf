@@ -127,10 +127,7 @@ resource "aws_ecs_task_definition" "strapi_task1" {
           name  = "TRANSFER_TOKEN_SALT"
           value = var.transfer_token_salt
         },
-        {
-          name  = "JWT_SECRET"
-          value = var.jwt_secret
-        }
+       
       ],
       logConfiguration = {
         logDriver = "awslogs",

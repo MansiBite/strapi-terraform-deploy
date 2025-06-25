@@ -52,5 +52,4 @@ jobs:
           TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
           TF_VAR_api_token_salt: ${{ secrets.API_TOKEN_SALT }}
           TF_VAR_transfer_token_salt: ${{ secrets.TRANSFER_TOKEN_SALT }}
-          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
         run: cd terraform && terraform apply -auto-approve

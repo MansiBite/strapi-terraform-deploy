@@ -15,4 +15,3 @@ variable "app_keys" {}
 variable "admin_jwt_secret" {}
 variable "api_token_salt" {}
 variable "transfer_token_salt" {}
-variable "jwt_secret" {}
