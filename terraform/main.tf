@@ -98,6 +98,7 @@ resource "aws_ecs_task_definition" "strapi_task1" {
   memory                   = "3072"
   execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
 
+  
   container_definitions = jsonencode([
     {
       name      = "strapi"
@@ -107,6 +108,28 @@ resource "aws_ecs_task_definition" "strapi_task1" {
         {
           containerPort = var.app_port
           protocol      = "tcp"
+        }
+      ],
+      environment = [
+        {
+          name  = "ADMIN_JWT_SECRET"
+          value = var.admin_jwt_secret
+        },
+        {
+          name  = "APP_KEYS"
+          value = var.app_keys
+        },
+        {
+          name  = "API_TOKEN_SALT"
+          value = var.api_token_salt
+        },
+        {
+          name  = "TRANSFER_TOKEN_SALT"
+          value = var.transfer_token_salt
+        },
+        {
+          name  = "JWT_SECRET"
+          value = var.jwt_secret
         }
       ],
       logConfiguration = {
@@ -120,7 +143,6 @@ resource "aws_ecs_task_definition" "strapi_task1" {
     }
   ])
 }
-
 
 resource "aws_ecs_service" "strapi_service1" {
   name            = "strapi-service1"

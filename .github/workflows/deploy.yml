@@ -1,47 +1,45 @@
-name: Deploy Strapi to AWS ECS using Terraform
+name: Deploy to AWS via Terraform
 
 on:
   push:
     branches:
       - main
 
-env:
-  AWS_REGION: ap-south-1
-  ECR_REPOSITORY: mansibite
-  IMAGE_TAG: latest
-
 jobs:
-  deploy:
+  terraform:
+    name: Terraform Deploy
     runs-on: ubuntu-latest
 
+    env:
+      AWS_REGION: ap-south-1
+
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v3
+    - name: Checkout Repository
+      uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.6.6
 
-      - name: Build, tag, and push image to ECR
-        run: |
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+    - name: Terraform Init
+      run: terraform init
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.6.6
+    - name: Terraform Plan
+      run: terraform plan
 
-      - name: Terraform Init and Apply
-        run: |
-          cd terraform
-          terraform init
-          terraform apply -auto-approve
+    - name: Terraform Apply
+      env:
+        TF_VAR_app_keys: ${{ secrets.APP_KEYS }}
+        TF_VAR_admin_jwt_secret: ${{ secrets.ADMIN_JWT_SECRET }}
+        TF_VAR_api_token_salt: ${{ secrets.API_TOKEN_SALT }}
+        TF_VAR_transfer_token_salt: ${{ secrets.TRANSFER_TOKEN_SALT }}
+        TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+      run: terraform apply -auto-approve
