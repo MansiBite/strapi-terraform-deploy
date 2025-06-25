@@ -186,3 +186,6 @@ resource "aws_cloudwatch_dashboard" "ecs_dashboard" {
     }]
   })
 }
+
+
+#updated
