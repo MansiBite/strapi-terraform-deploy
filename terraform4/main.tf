@@ -95,6 +95,7 @@ resource "aws_ecs_task_definition" "strapi_task1" {
       protocol      = "tcp"
     }]
     environment = [
+      { name = "NODE_ENV", value = "development" },                    
       { name = "ADMIN_JWT_SECRET", value = var.admin_jwt_secret },
       { name = "APP_KEYS", value = var.app_keys },
       { name = "API_TOKEN_SALT", value = var.api_token_salt },
