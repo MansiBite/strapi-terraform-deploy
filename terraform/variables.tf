@@ -10,8 +10,9 @@ variable "app_port" {
   default = 1337
 }
 
-# Strapi required secrets (will come from GitHub Actions secrets)
+# Strapi secrets from GitHub Actions
 variable "app_keys" {}
 variable "admin_jwt_secret" {}
 variable "api_token_salt" {}
 variable "transfer_token_salt" {}
+variable "encryption_key" {} 

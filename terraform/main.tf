@@ -127,7 +127,10 @@ resource "aws_ecs_task_definition" "strapi_task1" {
           name  = "TRANSFER_TOKEN_SALT"
           value = var.transfer_token_salt
         },
-       
+        {
+          name  = "ENCRYPTION_KEY"
+          value = var.encryption_key  
+        },
       ],
       logConfiguration = {
         logDriver = "awslogs",
