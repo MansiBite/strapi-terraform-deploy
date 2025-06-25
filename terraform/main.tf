@@ -1,14 +1,11 @@
-
 provider "aws" {
   region = var.region
 }
 
 # IAM Role (Data source)
-
 data "aws_iam_role" "ecs_task_execution_role" {
   name = "ecsTaskExecutionRole"
 }
-
 
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
@@ -53,7 +50,6 @@ resource "aws_route_table_association" "a2" {
   route_table_id = aws_route_table.rt.id
 }
 
-
 resource "aws_security_group" "strapi_sg" {
   name   = "strapi-sg"
   vpc_id = aws_vpc.main.id
@@ -73,7 +69,6 @@ resource "aws_security_group" "strapi_sg" {
   }
 }
 
-
 resource "aws_ecs_cluster" "strapi_cluster1" {
   name = "strapi-cluster1"
 
@@ -83,13 +78,6 @@ resource "aws_ecs_cluster" "strapi_cluster1" {
   }
 }
 
-
-resource "aws_cloudwatch_log_group" "strapi_logs" {
-  name              = "/ecs/strapi"
-  retention_in_days = 7
-}
-
-
 resource "aws_ecs_task_definition" "strapi_task1" {
   family                   = "strapi-task1"
   requires_compatibilities = ["FARGATE"]
@@ -98,50 +86,30 @@ resource "aws_ecs_task_definition" "strapi_task1" {
   memory                   = "3072"
   execution_role_arn       = data.aws_iam_role.ecs_task_execution_role.arn
 
-  
-  container_definitions = jsonencode([
-    {
-      name      = "strapi"
-      image     = var.image_url
-      essential = true
-      portMappings = [
-        {
-          containerPort = var.app_port
-          protocol      = "tcp"
-        }
-      ],
-      environment = [
-        {
-          name  = "ADMIN_JWT_SECRET"
-          value = var.admin_jwt_secret
-        },
-        {
-          name  = "APP_KEYS"
-          value = var.app_keys
-        },
-        {
-          name  = "API_TOKEN_SALT"
-          value = var.api_token_salt
-        },
-        {
-          name  = "TRANSFER_TOKEN_SALT"
-          value = var.transfer_token_salt
-        },
-        {
-          name  = "ENCRYPTION_KEY"
-          value = var.encryption_key  
-        },
-      ],
-      logConfiguration = {
-        logDriver = "awslogs",
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.strapi_logs.name,
-          awslogs-region        = var.region,
-          awslogs-stream-prefix = "ecs"
-        }
+  container_definitions = jsonencode([{
+    name      = "strapi"
+    image     = var.image_url
+    essential = true
+    portMappings = [{
+      containerPort = var.app_port
+      protocol      = "tcp"
+    }]
+    environment = [
+      { name = "ADMIN_JWT_SECRET", value = var.admin_jwt_secret },
+      { name = "APP_KEYS", value = var.app_keys },
+      { name = "API_TOKEN_SALT", value = var.api_token_salt },
+      { name = "TRANSFER_TOKEN_SALT", value = var.transfer_token_salt },
+      { name = "ENCRYPTION_KEY", value = var.encryption_key }
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = "/ecs/strapi"
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "ecs"
       }
     }
-  ])
+  }])
 }
 
 resource "aws_ecs_service" "strapi_service1" {
@@ -155,10 +123,8 @@ resource "aws_ecs_service" "strapi_service1" {
     subnets         = [aws_subnet.public_1.id, aws_subnet.public_2.id]
     assign_public_ip = true
     security_groups  = [aws_security_group.strapi_sg.id]
-
   }
 }
-
 
 resource "aws_cloudwatch_metric_alarm" "high_cpu" {
   alarm_name          = "HighCPUUtilization"
@@ -192,30 +158,26 @@ resource "aws_cloudwatch_metric_alarm" "high_memory" {
   }
 }
 
-
-
 resource "aws_cloudwatch_dashboard" "ecs_dashboard" {
   dashboard_name = "StrapiDashboard"
 
   dashboard_body = jsonencode({
-    widgets = [
-      {
-        type = "metric",
-        x = 0,
-        y = 0,
-        width = 12,
-        height = 6,
-        properties = {
-          metrics = [
-            ["ECS/ContainerInsights", "CPUUtilization", "ClusterName", aws_ecs_cluster.strapi_cluster1.name, "ServiceName", aws_ecs_service.strapi_service1.name],
-            ["ECS/ContainerInsights", "MemoryUtilization", "ClusterName", aws_ecs_cluster.strapi_cluster1.name, "ServiceName", aws_ecs_service.strapi_service1.name]
-          ],
-          view = "timeSeries",
-          stacked = false,
-          region = var.region,
-          title = "Strapi ECS CPU & Memory"
-        }
+    widgets = [{
+      type = "metric"
+      x = 0
+      y = 0
+      width = 12
+      height = 6
+      properties = {
+        metrics = [
+          ["ECS/ContainerInsights", "CPUUtilization", "ClusterName", aws_ecs_cluster.strapi_cluster1.name, "ServiceName", aws_ecs_service.strapi_service1.name],
+          ["ECS/ContainerInsights", "MemoryUtilization", "ClusterName", aws_ecs_cluster.strapi_cluster1.name, "ServiceName", aws_ecs_service.strapi_service1.name]
+        ]
+        view    = "timeSeries"
+        stacked = false
+        region  = var.region
+        title   = "Strapi ECS CPU & Memory"
       }
-    ]
+    }]
   })
 }
