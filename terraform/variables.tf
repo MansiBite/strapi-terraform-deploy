@@ -49,3 +49,4 @@ variable "encryption_key" {
   description = "Strapi ENCRYPTION_KEY"
   type        = string
 }
+#code
