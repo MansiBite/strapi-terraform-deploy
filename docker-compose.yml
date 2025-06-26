@@ -15,7 +15,9 @@ services:
       - strapi-network
 
   strapi:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev       #  Use dev Dockerfile
     container_name: strapi-app
     restart: always
     environment:
@@ -29,7 +31,11 @@ services:
     ports:
       - 1337:1337
     volumes:
-      - ./src:/app/src   #Make sure content types are synced with local
+      - ./src:/app/src                 #  Sync content-types
+      - ./config:/app/config           #  Sync config changes if needed
+      - ./public:/app/public           #  Sync public assets if needed
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
     depends_on:
       - postgres
     networks:
