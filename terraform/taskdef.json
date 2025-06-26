@@ -1,11 +1,11 @@
 {
   "family": "strapi-task1",
-  "executionRoleArn": "arn:aws:iam::123456789012:role/ecsTaskExecutionRole",
+  "executionRoleArn": "arn:aws:iam::057569470997:role/ecsTaskExecutionRole",
   "networkMode": "awsvpc",
   "containerDefinitions": [
     {
       "name": "strapi",
-      "image": "057569470997.dkr.ecr.ap-south-1.amazonaws.com/mansibite:latest",
+      "image": "057569470997.dkr.ecr.ap-south-1.amazonaws.com/mansibite:$IMAGE_TAG",
       "essential": true,
       "portMappings": [
         {
@@ -15,11 +15,11 @@
       ],
       "environment": [
         { "name": "NODE_ENV", "value": "production" },
-        { "name": "ADMIN_JWT_SECRET", "value": "$ADMIN_JWT_SECRET" },
-        { "name": "APP_KEYS", "value": "$APP_KEYS" },
-        { "name": "API_TOKEN_SALT", "value": "$API_TOKEN_SALT" },
-        { "name": "TRANSFER_TOKEN_SALT", "value": "$TRANSFER_TOKEN_SALT" },
-        { "name": "ENCRYPTION_KEY", "value": "$ENCRYPTION_KEY" }
+        { "name": "ADMIN_JWT_SECRET", "value": "${ADMIN_JWT_SECRET}" },
+        { "name": "APP_KEYS", "value": "${APP_KEYS}" },
+        { "name": "API_TOKEN_SALT", "value": "${API_TOKEN_SALT}" },
+        { "name": "TRANSFER_TOKEN_SALT", "value": "${TRANSFER_TOKEN_SALT}" },
+        { "name": "ENCRYPTION_KEY", "value": "${ENCRYPTION_KEY}" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
@@ -35,4 +35,3 @@
   "cpu": "1024",
   "memory": "3072"
 }
-#code

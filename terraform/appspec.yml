@@ -1,25 +1,9 @@
-version: 1
+version: 0.0
 Resources:
   - TargetService:
       Type: AWS::ECS::Service
       Properties:
-        TaskDefinition: "strapi-task1"
+        TaskDefinition: REPLACE_ME_TASK_DEF_ARN
         LoadBalancerInfo:
-          ContainerName: "strapi"
+          ContainerName: strapi
           ContainerPort: 1337
-
-Hooks:
-  BeforeInstall:
-    - location: scripts/before-install.sh
-      timeout: 300
-      runas: root
-
-  AfterInstall:
-    - location: scripts/after-install.sh
-      timeout: 300
-      runas: root
-
-  AfterAllowTestTraffic:
-    - location: scripts/verify.sh
-      timeout: 300
-      runas: root
