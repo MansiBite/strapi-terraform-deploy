@@ -11,7 +11,7 @@ data "aws_iam_role" "ecs_task_execution_role" {
   name = "ecsTaskExecutionRole"
 }
 
-# VPC, Subnets, IGW, Route Tables (No Change Required Here)
+# VPC, Subnets, IGW, Route Tables
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
@@ -60,8 +60,8 @@ resource "aws_route_table_association" "a2" {
 # --------------------------------------------
 
 resource "aws_security_group" "alb_sg" {
-  name        = "alb-sg"
-  vpc_id      = aws_vpc.main.id
+  name   = "alb-sg"
+  vpc_id = aws_vpc.main.id
 
   ingress {
     from_port   = 80
@@ -248,8 +248,8 @@ resource "aws_ecs_service" "strapi_service1" {
 # --------------------------------------------
 
 resource "aws_codedeploy_app" "strapi_app" {
-  name = "strapi-cd-app"
-  compute_platform = "ECS"
+  name              = "strapi-cd-app"
+  compute_platform  = "ECS"
 }
 
 resource "aws_iam_role" "codedeploy_role" {
@@ -273,7 +273,7 @@ resource "aws_iam_role_policy_attachment" "codedeploy_policy" {
 
 resource "aws_iam_role_policy" "codedeploy_inline" {
   name = "codedeploy-ecs-access"
-  role = aws_iam_role.codedeploy_role.id  # Link to the CodeDeploy role
+  role = aws_iam_role.codedeploy_role.id
 
   policy = jsonencode({
     Version = "2012-10-17",
@@ -295,20 +295,21 @@ resource "aws_iam_role_policy" "codedeploy_inline" {
   })
 }
 
-
 resource "aws_codedeploy_deployment_group" "strapi_dg" {
   app_name              = aws_codedeploy_app.strapi_app.name
   deployment_group_name = "strapi-dg"
   service_role_arn      = aws_iam_role.codedeploy_role.arn
 
+  deployment_config_name = "CodeDeployDefault.ECSAllAtOnce" # ✅ Fix for ECS platform
+
   deployment_style {
-    deployment_type = "BLUE_GREEN"
+    deployment_type   = "BLUE_GREEN"
     deployment_option = "WITH_TRAFFIC_CONTROL"
   }
 
   blue_green_deployment_config {
     terminate_blue_instances_on_deployment_success {
-      action = "TERMINATE"
+      action                           = "TERMINATE"
       termination_wait_time_in_minutes = 5
     }
     deployment_ready_option {
@@ -335,4 +336,3 @@ resource "aws_codedeploy_deployment_group" "strapi_dg" {
     }
   }
 }
-
