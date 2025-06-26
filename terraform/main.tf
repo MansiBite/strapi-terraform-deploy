@@ -268,8 +268,33 @@ resource "aws_iam_role" "codedeploy_role" {
 
 resource "aws_iam_role_policy_attachment" "codedeploy_policy" {
   role       = aws_iam_role.codedeploy_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForECS"
+  policy_arn = "arn:aws:iam::aws:policy/AWSCodeDeployFullAccess"
 }
+
+resource "aws_iam_role_policy" "codedeploy_inline" {
+  name = "codedeploy-ecs-access"
+  role = aws_iam_role.codedeploy_role.id  # Link to the CodeDeploy role
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "ecs:DescribeServices",
+          "ecs:UpdateService",
+          "ecs:DescribeTaskDefinition",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeListeners",
+          "elasticloadbalancing:ModifyListener",
+          "iam:PassRole"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 
 resource "aws_codedeploy_deployment_group" "strapi_dg" {
   app_name              = aws_codedeploy_app.strapi_app.name
