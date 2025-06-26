@@ -1,4 +1,4 @@
 output "strapi_url" {
-  description = "Access your Strapi app using the ECS public IP"
-  value       = "Deployed! Check ECS Task Public IP from AWS Console → ECS → Tasks"
+  description = "Access your Strapi app using the ALB"
+  value       = aws_lb.strapi_alb.dns_name
 }

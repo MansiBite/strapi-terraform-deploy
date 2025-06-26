@@ -1,3 +1,7 @@
+# --------------------------------------------
+# ✅ Task-11: Blue/Green Deployment with CodeDeploy
+# --------------------------------------------
+
 provider "aws" {
   region = var.region
 }
@@ -7,6 +11,7 @@ data "aws_iam_role" "ecs_task_execution_role" {
   name = "ecsTaskExecutionRole"
 }
 
+# VPC, Subnets, IGW, Route Tables (No Change Required Here)
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
@@ -50,13 +55,24 @@ resource "aws_route_table_association" "a2" {
   route_table_id = aws_route_table.rt.id
 }
 
-resource "aws_security_group" "strapi_sg" {
-  name   = "strapi-sg"
-  vpc_id = aws_vpc.main.id
+# --------------------------------------------
+# ✅ Security Groups
+# --------------------------------------------
+
+resource "aws_security_group" "alb_sg" {
+  name        = "alb-sg"
+  vpc_id      = aws_vpc.main.id
 
   ingress {
-    from_port   = var.app_port
-    to_port     = var.app_port
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -69,6 +85,29 @@ resource "aws_security_group" "strapi_sg" {
   }
 }
 
+resource "aws_security_group" "ecs_sg" {
+  name   = "ecs-sg"
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port       = var.app_port
+    to_port         = var.app_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# --------------------------------------------
+# ✅ ECS Cluster
+# --------------------------------------------
+
 resource "aws_ecs_cluster" "strapi_cluster1" {
   name = "strapi-cluster1"
 
@@ -77,6 +116,65 @@ resource "aws_ecs_cluster" "strapi_cluster1" {
     value = "enabled"
   }
 }
+
+# --------------------------------------------
+# ✅ Load Balancer + Target Groups
+# --------------------------------------------
+
+resource "aws_lb" "strapi_alb" {
+  name               = "strapi-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = [aws_subnet.public_1.id, aws_subnet.public_2.id]
+}
+
+resource "aws_lb_target_group" "blue_tg" {
+  name        = "strapi-blue-tg"
+  port        = var.app_port
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200-399"
+  }
+}
+
+resource "aws_lb_target_group" "green_tg" {
+  name        = "strapi-green-tg"
+  port        = var.app_port
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200-399"
+  }
+}
+
+resource "aws_lb_listener" "http_listener" {
+  load_balancer_arn = aws_lb.strapi_alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.blue_tg.arn
+  }
+}
+
+# --------------------------------------------
+# ✅ ECS Task Definition
+# --------------------------------------------
 
 resource "aws_ecs_task_definition" "strapi_task1" {
   family                   = "strapi-task1"
@@ -95,7 +193,7 @@ resource "aws_ecs_task_definition" "strapi_task1" {
       protocol      = "tcp"
     }]
     environment = [
-      { name = "NODE_ENV", value = "development" },                    
+      { name = "NODE_ENV", value = "development" },
       { name = "ADMIN_JWT_SECRET", value = var.admin_jwt_secret },
       { name = "APP_KEYS", value = var.app_keys },
       { name = "API_TOKEN_SALT", value = var.api_token_salt },
@@ -113,79 +211,111 @@ resource "aws_ecs_task_definition" "strapi_task1" {
   }])
 }
 
+# --------------------------------------------
+# ✅ ECS Service for CodeDeploy
+# --------------------------------------------
+
 resource "aws_ecs_service" "strapi_service1" {
   name            = "strapi-service1"
   cluster         = aws_ecs_cluster.strapi_cluster1.id
   task_definition = aws_ecs_task_definition.strapi_task1.arn
+  launch_type     = "FARGATE"
   desired_count   = 1
-
-  capacity_provider_strategy {
-    capacity_provider = "FARGATE_SPOT"
-    weight            = 1
-  }
 
   network_configuration {
     subnets         = [aws_subnet.public_1.id, aws_subnet.public_2.id]
     assign_public_ip = true
-    security_groups  = [aws_security_group.strapi_sg.id]
+    security_groups  = [aws_security_group.ecs_sg.id]
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.blue_tg.arn
+    container_name   = "strapi"
+    container_port   = var.app_port
+  }
+
+  deployment_controller {
+    type = "CODE_DEPLOY"
+  }
+
+  lifecycle {
+    ignore_changes = [task_definition]
   }
 }
 
-resource "aws_cloudwatch_metric_alarm" "high_cpu" {
-  alarm_name          = "HighCPUUtilization"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
-  metric_name         = "CPUUtilization"
-  namespace           = "ECS/ContainerInsights"
-  period              = 60
-  statistic           = "Average"
-  threshold           = 70
-  alarm_description   = "Triggered when CPU > 70%"
-  dimensions = {
-    ClusterName = aws_ecs_cluster.strapi_cluster1.name
-    ServiceName = aws_ecs_service.strapi_service1.name
-  }
+# --------------------------------------------
+# ✅ CodeDeploy Application & Deployment Group
+# --------------------------------------------
+
+resource "aws_codedeploy_app" "strapi_app" {
+  name = "strapi-cd-app"
+  compute_platform = "ECS"
 }
 
-resource "aws_cloudwatch_metric_alarm" "high_memory" {
-  alarm_name          = "HighMemoryUtilization"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
-  metric_name         = "MemoryUtilization"
-  namespace           = "ECS/ContainerInsights"
-  period              = 60
-  statistic           = "Average"
-  threshold           = 80
-  alarm_description   = "Triggered when Memory > 80%"
-  dimensions = {
-    ClusterName = aws_ecs_cluster.strapi_cluster1.name
-    ServiceName = aws_ecs_service.strapi_service1.name
-  }
-}
-
-resource "aws_cloudwatch_dashboard" "ecs_dashboard" {
-  dashboard_name = "StrapiDashboard"
-
-  dashboard_body = jsonencode({
-    widgets = [{
-      type = "metric"
-      x = 0
-      y = 0
-      width = 12
-      height = 6
-      properties = {
-        metrics = [
-          ["ECS/ContainerInsights", "CPUUtilization", "ClusterName", aws_ecs_cluster.strapi_cluster1.name, "ServiceName", aws_ecs_service.strapi_service1.name],
-          ["ECS/ContainerInsights", "MemoryUtilization", "ClusterName", aws_ecs_cluster.strapi_cluster1.name, "ServiceName", aws_ecs_service.strapi_service1.name]
-        ]
-        view    = "timeSeries"
-        stacked = false
-        region  = var.region
-        title   = "Strapi ECS CPU & Memory"
-      }
+resource "aws_iam_role" "codedeploy_role" {
+  name = "codedeploy-strapi-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Service = "codedeploy.amazonaws.com"
+      },
+      Action = "sts:AssumeRole"
     }]
   })
 }
 
+resource "aws_iam_role_policy_attachment" "codedeploy_policy" {
+  role       = aws_iam_role.codedeploy_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForECS"
+}
 
-#updated
+resource "aws_codedeploy_deployment_group" "strapi_dg" {
+  app_name              = aws_codedeploy_app.strapi_app.name
+  deployment_group_name = "strapi-dg"
+  service_role_arn      = aws_iam_role.codedeploy_role.arn
+
+  deployment_style {
+    deployment_type = "BLUE_GREEN"
+    deployment_option = "WITH_TRAFFIC_CONTROL"
+  }
+
+  blue_green_deployment_config {
+    terminate_blue_instances_on_deployment_success {
+      action = "TERMINATE"
+      termination_wait_time_in_minutes = 5
+    }
+    deployment_ready_option {
+      action_on_timeout = "CONTINUE_DEPLOYMENT"
+    }
+  }
+
+  ecs_service {
+    cluster_name = aws_ecs_cluster.strapi_cluster1.name
+    service_name = aws_ecs_service.strapi_service1.name
+  }
+
+  load_balancer_info {
+    target_group_pair_info {
+      target_group {
+        name = aws_lb_target_group.blue_tg.name
+      }
+      target_group {
+        name = aws_lb_target_group.green_tg.name
+      }
+      prod_traffic_route {
+        listener_arns = [aws_lb_listener.http_listener.arn]
+      }
+    }
+  }
+}
+
+# --------------------------------------------
+# ✅ CloudWatch Dashboard Output
+# --------------------------------------------
+
+output "strapi_url" {
+  description = "Access your Strapi app using the ALB"
+  value       = aws_lb.strapi_alb.dns_name
+}
