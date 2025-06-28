@@ -61,16 +61,26 @@ jobs:
           TF_VAR_encryption_key: ${{ secrets.ENCRYPTION_KEY }}
         run: cd terraform && terraform apply -auto-approve
 
-      - name: Base64 encode AppSpec YAML
+      - name: Prepare final task definition file with secrets
         run: |
-          APPSPEC_BASE64=$(base64 terraform/appspec.yml | tr -d '\n')
-          echo "APPSPEC_BASE64=$APPSPEC_BASE64" >> $GITHUB_ENV
+          mkdir -p terraform/output
+          envsubst < terraform/taskdef.json > terraform/output/taskdef-final.json
+        env:
+          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+          APP_KEYS: ${{ secrets.APP_KEYS }}
+          API_TOKEN_SALT: ${{ secrets.API_TOKEN_SALT }}
+          TRANSFER_TOKEN_SALT: ${{ secrets.TRANSFER_TOKEN_SALT }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
 
       - name: Trigger CodeDeploy Blue/Green deployment
         run: |
+          APPSPEC_CONTENT=$(base64 terraform/appspec.yml | tr -d '\n')
+
           aws deploy create-deployment \
             --application-name strapi-cd-app \
             --deployment-group-name strapi-dg \
             --deployment-config-name CodeDeployDefault.ECSCanary10Percent5Minutes \
-            --revision "revisionType=AppSpecContent,appSpecContent={content=$APPSPEC_BASE64}" \
+            --revision "revisionType=AppSpecContent,appSpecContent={content=$APPSPEC_CONTENT}" \
             --description "Strapi Blue/Green Deployment from GitHub Actions"
+
