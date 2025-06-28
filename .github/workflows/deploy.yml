@@ -75,7 +75,7 @@ jobs:
 
       - name: Trigger CodeDeploy Blue/Green deployment
         run: |
-          APPSPEC_CONTENT=$(base64 terraform/appspec.yml | tr -d '\n')
+          APPSPEC_CONTENT=$(cat terraform/appspec.yml | base64 | tr -d '\n')
 
           aws deploy create-deployment \
             --application-name strapi-cd-app \
@@ -83,4 +83,5 @@ jobs:
             --deployment-config-name CodeDeployDefault.ECSCanary10Percent5Minutes \
             --revision "revisionType=AppSpecContent,appSpecContent={content=$APPSPEC_CONTENT}" \
             --description "Strapi Blue/Green Deployment from GitHub Actions"
+
 
