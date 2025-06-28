@@ -7,4 +7,3 @@ Resources:
         LoadBalancerInfo:
           ContainerName: "strapi"
           ContainerPort: 1337
-#run
